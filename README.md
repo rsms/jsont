@@ -1,8 +1,8 @@
 # JSON Tokenizer (jsont)
 
-A minimal and portable JSON tokenizer with syntax validation, suitable for parsing JSON directly into custom data structures or to be inspected rather than stored.
+A minimal and portable JSON tokenizer written in standard, modern C. Performs syntax validation and highly efficient parsing suitable for reading JSON directly into custom data structures.
 
-`example2.c` shows how this tokenizer can be used to build highly effective and strict parsers.
+`example1.c` provides an example of basic usage while `example2.c` shows how this tokenizer can be used to build highly effective and strict parsers.
 
 Build and run unit tests:
 
@@ -10,12 +10,14 @@ Build and run unit tests:
 
 ## Synopsis
 
-    jsont_ctx_t* S = jsont_create(0);
-    jsont_reset(S, uint8_t* inbuf, size_t inbuf_len);
-    tok = jsont_next(S)
-    // branch on `tok` ...
-    V = jsont_*_value(S[, ...]);
-    jsont_destroy(S);
+```c
+jsont_ctx_t* S = jsont_create(0);
+jsont_reset(S, uint8_t* inbuf, size_t inbuf_len);
+tok = jsont_next(S)
+// branch on `tok` ...
+V = jsont_*_value(S[, ...]);
+jsont_destroy(S);
+```
 
 ## API overview
 
