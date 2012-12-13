@@ -34,14 +34,18 @@ enum {
   JSONT_NULL,           // null
 
   _JSONT_VALUES_START,
-  JSONT_NUMBER_INT,     // value accessible through jsont_value_int
-  JSONT_NUMBER_FLOAT,   // value accessible through jsont_value_float
-  JSONT_STRING,         // value accessible through jsont_string_value
-  JSONT_FIELD_NAME,     // value accessible through jsont_string_value
+  JSONT_NUMBER_INT,     // number value without a fraction part
+  JSONT_NUMBER_FLOAT,   // number value with a fraction part
+  JSONT_STRING,         // string value
+  JSONT_FIELD_NAME,     // field name
   _JSONT_VALUES_END,
 
   _JSONT_COMMA,
 };
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Create a new JSON tokenizer context. `user_data` can be anything and is
 // accessible through `jsont_user_data`.
@@ -101,5 +105,9 @@ jsont_err_t jsont_error_info(jsont_ctx_t* ctx);
 
 // Returns the value passed to `jsont_create`.
 void* jsont_user_data(const jsont_ctx_t* ctx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // JSONT_INCLUDED
