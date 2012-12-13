@@ -4,8 +4,10 @@
 #ifndef JSONT_INCLUDED
 #define JSONT_INCLUDED
 
-#include <stdint.h> // uint8_t, int64_t
-#include <stdlib.h> // size_t
+#include <stdint.h>  // uint8_t, int64_t
+#include <stdlib.h>  // size_t
+#include <string.h>  // strlen
+#include <stdbool.h> // bool
 
 #ifndef _JSONT_IN_SOURCE
 typedef struct jsont_ctx jsont_ctx_t;
@@ -13,7 +15,7 @@ typedef uint8_t jsont_tok_t;
 #endif
 
 #ifndef JSONT_ERRINFO_CUSTOM
-#define JSONT_ERRINFO_T const char*
+#define jsont_err_t const char*
 #endif
 
 // Token types
@@ -65,17 +67,26 @@ jsont_tok_t jsont_current(const jsont_ctx_t* ctx);
 // (returns 0) if the current token has no value (e.g. start of an object).
 size_t jsont_data_value(jsont_ctx_t* ctx, const uint8_t** bytes);
 
-// Similar to `jsont_data_value` but returns a newly allocated copy of the
-// current value as a C string (terminated by a null byte). The calling code is
-// responsible for calling `free()` on the returned value.
+// Returns true if the current data value is equal to `bytes` of `length`
+bool jsont_data_equals(jsont_ctx_t* ctx, const uint8_t* bytes, size_t length);
+
+// Returns true if the current data value is equal to c string `str`
+static inline bool jsont_str_equals(jsont_ctx_t* ctx, const char* str) {
+  return jsont_data_equals(ctx, (const uint8_t*)str, strlen(str));
+}
+
+// Retrieve a newly allocated c-string. Similar to `jsont_data_value` but
+// returns a newly allocated copy of the current value as a C string
+// (terminated by a null byte). The calling code is responsible for calling
+// `free()` on the returned value.
 char* jsont_strcpy_value(jsont_ctx_t* ctx);
 
-// Returns the integer value of the current token. Sets errno and returns
-// INT64_MIN if the current token is not a number or is too large.
+// Returns the current integer value.If the number is too large or too small,
+// this function sets errno and returns INT64_MAX or INT64_MIN.
 int64_t jsont_int_value(jsont_ctx_t* ctx);
 
-// Returns the integer value of the current token. Sets errno and returns
-// a value that isnan(N)==true.
+// Returns the current floating-point number value. Sets errno and returns a
+// value that isnan(N)==true on error.
 double jsont_float_value(jsont_ctx_t* ctx);
 
 // Get the last byte read. Suitable for debugging JSONT_ERR.
@@ -86,7 +97,7 @@ size_t jsont_current_offset(jsont_ctx_t* ctx);
 
 // Get information on the last error (by default a printable text message).
 // Returns NULL if no error has occured since a call to `jsont_reset`.
-JSONT_ERRINFO_T jsont_error_info(jsont_ctx_t* ctx);
+jsont_err_t jsont_error_info(jsont_ctx_t* ctx);
 
 // Returns the value passed to `jsont_create`.
 void* jsont_user_data(const jsont_ctx_t* ctx);

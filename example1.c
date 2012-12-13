@@ -15,7 +15,7 @@ int main(int argc, const char** argv) {
   // Sample input
   const char* inbuf = "{\"Ape\":123,\"Bro\":[400192,\"51\",true, false, null,"
                       " -67,\r\n\t 6.123]}";
-  
+
   // Reset the parser with a pointer to our sample input
   jsont_reset(S, (const uint8_t*)inbuf, strlen(inbuf));
 
