@@ -1,14 +1,14 @@
 # JSON Tokenizer (jsont)
 
-A minimal and portable JSON tokenizer written in standard, modern C. Performs syntax validation and highly efficient parsing suitable for reading JSON directly into custom data structures.
-
-`example1.c` provides an example of basic usage while `example2.c` shows how this tokenizer can be used to build highly effective and strict parsers.
+A minimal and portable JSON tokenizer written in standard C++. Performs validating and highly efficient parsing suitable for reading JSON directly into custom data structures. There are no code dependencies — simply include `jsont.{h,hh,c,cc}` in your project.
 
 Build and run unit tests:
 
     make
 
 ## Synopsis
+
+C API:
 
 ```c
 jsont_ctx_t* S = jsont_create(0);
@@ -19,9 +19,105 @@ V = jsont_*_value(S[, ...]);
 jsont_destroy(S);
 ```
 
-## API overview
+New C++ API:
 
-See `jsont.h` for a complete overview of the API, incuding more detailed documentation. Here's an overview:
+```cc
+jsont::Tokenizer S(const char* inbuf, size_t length);
+jsont::Token token;
+while ((token = S.next())) {
+  if (token == jsont::Float) {
+    printf("%g\n", S.floatValue());
+  }
+}
+
+jsont::Builder json;
+json.startObject()
+    .fieldName("foo").value(123.45)
+    .fieldName("bar").startArray()
+      .value(678)
+      .value("nine \"ten\"")
+    .endArray()
+  .endObject();
+std::cout << json.toString() << std::endl;
+// {"foo":123.45,"bar":[678,"nine \"ten\""]}
+```
+
+# API overview
+
+See `jsont.h` and `jsont.hh` for a complete overview of the API, incuding more detailed documentation. Here's an overview:
+
+## C++ API
+
+namespace `jsont`
+
+- `Builder build()` — convenience builder factory
+
+### class Tokenizer
+
+Reads a sequence of bytes and produces tokens and values while doing so.
+
+- `Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `enc`
+- `const Token& next()` — Read next token
+- `const Token& current() const` — Access current token
+- `void reset(const uint8_t* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
+- `bool hasValue() const` — True if the current token has a value
+- `size_t dataValue(const uint8_t const** bytes)` — Returns a slice of the input which represents the current value, or nothing (returns 0) if the current token has no value (e.g. start of an object).
+- `std::string stringValue() const` — Returns a *copy* of the current string value.
+- `double floatValue() const` — Returns the current value as a double-precision floating-point number.
+- `int64_t intValue() const` — Returns the current value as a signed 64-bit integer.
+
+### class Builder
+
+Aids in building JSON, providing a final sequential byte buffer.
+
+- `Builder()` — initialize a new builder with an empty backing buffer
+- `Builder& startObject()` — Start an object (appends a `'{'` character to the backing buffer)
+- `Builder& endObject()` — End an object (a `'}'` character)
+- `Builder& startArray()` — Start an array (`'['`)
+- `Builder& endArray()` — End an array (`']'`)
+- `Builder& fieldName(const char* v, size_t length, TextEncoding encoding=UTF8TextEncoding)` — Adds a field name by copying `length` bytes from `v`.
+- `Builder& fieldName(const std::string& name, TextEncoding encoding=UTF8TextEncoding)` — Adds a field name by copying `name`.
+- `Builder& value(const char* v, size_t length, TextEncoding encoding=UTF8TextEncoding)` — Adds a string value by copying `length` bytes from `v` which content is encoded according to `encoding`.
+- `Builder& value(const char* v)` — Adds a string value by copying `strlen(v)` bytes from c-string `v`. Uses the default encoding of `value(const char*,size_t,TextEncoding)`.
+- `Builder& value(const std::string& v)`  — Adds a string value by copying `v`. Uses the default encoding of `value(const char*,size_t,TextEncoding)`.
+- `Builder& value(double v)` — Adds a possibly fractional number
+- `Builder& value(int64_t v)`, `void value(int v)`, `void value(unsigned int v)`, `void value(long v)` — Adds an integer number
+- `Builder& value(bool v)` — Adds the "true" or "false" atom, depending on `v`
+- `Builder& nullValue()` — Adds the "null" atom
+- `size_t size() const` — Number of readable bytes at the pointer returned by `bytes()`
+- `const char* bytes() const` — Pointer to the backing buffer, holding the resulting JSON.
+- `std::string toString() const` — Return a `std::string` object holding a copy of the backing buffer, representing the JSON.
+- `const char* seizeBytes(size_t& size_out)` — "Steal" the backing buffer. After this call, the caller is responsible for calling `free()` on the returned pointer. Returns NULL on failure. Sets the value of `size_out` to the number of readable bytes at the returned pointer. The builder will be reset and ready to use (which will act on a new backing buffer).
+- `const void reset()` — Reset the builder to its neutral state. Note that the backing buffer is reused in this case.
+
+### class Error
+
+Represents an unrecoverable error
+
+- `Error(const std::string& msg)` — Initialize a new error
+
+### enum Token
+
+- `End` —           Input ended
+- `ObjectStart` —   {
+- `ObjectEnd` —     }
+- `ArrayStart` —    [
+- `ArrayEnd` —      ]
+- `True` —          true
+- `False` —         false
+- `Null` —          null
+- `Integer` —       number value without a fraction part (access as int64 through `Tokenizer::intValue()`)
+- `Float` —         number value with a fraction part (access as double through `Tokenizer::floatValue()`)
+- `String` —        string value (access value through `Tokenizer::stringValue()` et al)
+- `FieldName` —     field name (access value through `Tokenizer::stringValue()` et al)
+
+### enum TextEncoding
+
+- `UTF8TextEncoding` — Unicode UTF-8 text encoding
+
+----
+
+## C API
 
 ### Types
 
