@@ -106,8 +106,172 @@ jsont_err_t jsont_error_info(jsont_ctx_t* ctx);
 // Returns the value passed to `jsont_create`.
 void* jsont_user_data(const jsont_ctx_t* ctx);
 
+// ----------------- C++ -----------------
 #ifdef __cplusplus
-}
+} // extern "C"
+
+#include <string>
+#include <math.h>
+#include <assert.h>
+
+namespace jsont {
+
+class Builder {
+public:
+  Builder() : _buf(0), _capacity(0), _size(0), _state(NeutralState) {}
+  ~Builder() { if (_buf) { free(_buf); _buf = 0; } }
+
+  void startObject() { prefix(); append('{'); _state = ObjectStart; }
+  void endObject() { append('}'); _state = AfterValue; }
+
+  void startArray() { prefix(); append('['); _state = ArrayStart; }
+  void endArray() { append(']'); _state = AfterValue; }
+
+  void fieldName(const std::string& name) {
+    prefix();
+    string(name);
+    _state = AfterFieldName;
+  }
+
+  void field(const std::string& name, const std::string& v) {
+    fieldName(name);
+    value(v);
+  }
+  void field(const std::string& name, const char* v) {
+    fieldName(name);
+    value(v);
+  }
+  void field(const std::string& name, double v) { fieldName(name); value(v); }
+  void field(const std::string& name, int64_t v) { fieldName(name); value(v); }
+  void field(const std::string& name, int v) { field(name, (int64_t)v); }
+  void field(const std::string& name, unsigned int v) {
+    field(name, (int64_t)v);
+  }
+  void field(const std::string& name, long v) { field(name, (int64_t)v); }
+
+  void value(const char* v) { prefix(); string(v); _state = AfterValue; }
+  void value(const char* v, size_t length) {
+    prefix();
+    string(v);
+    _state = AfterValue;
+  }
+  void value(const std::string& v) { prefix(); string(v); _state = AfterValue; }
+  void value(double v) {
+    prefix();
+    reserve(256);
+    int z = snprintf(_buf+_size, 256, "%g", v);
+    assert(z < 256);
+    _size += z;
+    _state = AfterValue;
+  }
+  void value(int64_t v) {
+    prefix();
+    reserve(21);
+    int z = snprintf(_buf+_size, 21, "%lld", v);
+    assert(z < 21);
+    _size += z;
+    _state = AfterValue;
+  }
+  void value(int v) { value((int64_t)v); }
+  void value(unsigned int v) { value((int64_t)v); }
+  void value(long v) { value((int64_t)v); }
+
+  const char* bytes() const { return _buf; }
+  size_t size() const { return _size; }
+
+  const char* seizeBytes(size_t& size_out) {
+    const char* buf = _buf;
+    size_out = _size;
+    _buf = 0;
+    _size = 0;
+    _capacity = 0;
+    return buf;
+  }
+
+// Can haz rvalue move semantics?
+#if (defined(_MSC_VER) && _MSC_VER >= 1600) || \
+    (defined(__GXX_EXPERIMENTAL_CXX0X__) && __GXX_EXPERIMENTAL_CXX0X__) || \
+    (defined(__has_feature) && __has_feature(cxx_rvalue_references))
+  // Move constructor and assignment operator
+  Builder(Builder&& other)
+      : _buf(other._buf)
+      , _capacity(other._capacity)
+      , _size(other._size)
+      , _state(other._state) {
+    other._buf = 0;
+  }
+  Builder& operator=(Builder&& other) {
+    _buf = other._buf; other._buf = 0;
+    _capacity = other._capacity;
+    _size = other._size;
+    _state = other._state;
+    return *this;
+  }
 #endif
+
+  // Copy constructor and assignment operator
+  Builder(const Builder& other)
+      : _buf(0)
+      , _capacity(other._capacity)
+      , _size(other._size)
+      , _state(other._state) {
+    _buf = (char*)malloc(_capacity);
+    memcpy((void*)_buf, (const void*)other._buf, _capacity);
+  }
+  Builder& operator=(const Builder& other) {
+    _capacity = other._capacity;
+    _size = other._size;
+    _state = other._state;
+    _buf = (char*)malloc(_capacity);
+    memcpy((void*)_buf, (const void*)other._buf, _capacity);
+    return *this;
+  }
+
+private:
+  inline size_t available() const { return _capacity - _size; }
+
+  inline void reserve(size_t size) {
+    if (available() < size) {
+      _capacity = _capacity + size - available();
+      _capacity = (_capacity < 64) ? 64 : (_capacity * 1.5);
+      _buf = (char*)realloc((void*)_buf, _capacity);
+    }
+  }
+
+  inline void prefix() {
+    if (_state == AfterFieldName) {
+      append(':');
+    } else if (_state == AfterValue) {
+      append(',');
+    }
+  }
+
+  void string(const std::string& v) { string(v.data(), v.size()); }
+  void string(const char* v) { string(v, strlen(v)); }
+  void string(const char* v, size_t length) {
+    reserve(length + 2);
+    _buf[_size++] = '"';
+    memcpy((void*)(_buf+_size), (const void*)v, length);
+    _size += length;
+    _buf[_size++] = '"';
+  }
+
+  inline void append(char byte) { reserve(1); _buf[_size++] = byte; }
+
+  char*  _buf;
+  size_t _capacity;
+  size_t _size;
+  enum {
+    NeutralState = 0,
+    AfterFieldName,
+    AfterValue,
+    ObjectStart,
+    ArrayStart,
+  } _state;
+};
+
+}
+
+#endif // __cplusplus
 
 #endif // JSONT_INCLUDED
