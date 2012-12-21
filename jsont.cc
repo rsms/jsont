@@ -133,7 +133,7 @@ int64_t Tokenizer::intValue() const {
       char* buf[21];
       if (_value.length > 20) {
         // We are unable to interpret such a large literal in this edge-case
-        return _JSONT_NAN;
+        return 0;
       }
       memcpy((void*)buf, (const void*)bytes, _value.length);
       buf[_value.length] = '\0';
