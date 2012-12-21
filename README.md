@@ -62,14 +62,38 @@ namespace `jsont`
 Reads a sequence of bytes and produces tokens and values while doing so.
 
 - `Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `encoding`
+- `void reset(const uint8_t* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
+
+#### Reading tokens
+
 - `const Token& next() throw(Error)` — Read next token, possibly throwing an `Error`
 - `const Token& current() const` — Access current token
-- `void reset(const uint8_t* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
+
+#### Reading values
+
 - `bool hasValue() const` — True if the current token has a value
 - `size_t dataValue(const uint8_t const** bytes)` — Returns a slice of the input which represents the current value, or nothing (returns 0) if the current token has no value (e.g. start of an object).
 - `std::string stringValue() const` — Returns a *copy* of the current string value.
 - `double floatValue() const` — Returns the current value as a double-precision floating-point number.
 - `int64_t intValue() const` — Returns the current value as a signed 64-bit integer.
+
+#### Handling errors
+
+- `ErrorCode error() const` — Returns the error code of the last error
+- `const char* errorMessage() const` — Returns a human-readable message for the last error. Never returns NULL.
+- `size_t inputOffset() const` — The byte offset into input where the tokenizer is currently looking. In the event of an error, this will point to the source of the error.
+
+##### enum ErrorCode
+
+- `UnspecifiedError` — Unspecified error
+- `UnexpectedComma` — Unexpected comma
+- `UnexpectedTrailingComma` — Unexpected trailing comma
+- `InvalidByte` — Invalid input byte
+- `PrematureEndOfInput` — Premature end of input
+- `MalformedUnicodeEscapeSequence` — Malformed Unicode escape sequence
+- `MalformedNumberLiteral` — Malformed number literal
+- `UnterminatedString` — Unterminated string
+- `SyntaxError` — Illegal JSON (syntax error)
 
 ### class Builder
 
@@ -80,6 +104,10 @@ Aids in building JSON, providing a final sequential byte buffer.
 - `Builder& endObject()` — End an object (a `'}'` character)
 - `Builder& startArray()` — Start an array (`'['`)
 - `Builder& endArray()` — End an array (`']'`)
+- `const void reset()` — Reset the builder to its neutral state. Note that the backing buffer is reused in this case.
+
+#### Building
+
 - `Builder& fieldName(const char* v, size_t length, TextEncoding encoding=UTF8TextEncoding)` — Adds a field name by copying `length` bytes from `v`.
 - `Builder& fieldName(const std::string& name, TextEncoding encoding=UTF8TextEncoding)` — Adds a field name by copying `name`.
 - `Builder& value(const char* v, size_t length, TextEncoding encoding=UTF8TextEncoding)` — Adds a string value by copying `length` bytes from `v` which content is encoded according to `encoding`.
@@ -89,17 +117,13 @@ Aids in building JSON, providing a final sequential byte buffer.
 - `Builder& value(int64_t v)`, `void value(int v)`, `void value(unsigned int v)`, `void value(long v)` — Adds an integer number
 - `Builder& value(bool v)` — Adds the "true" or "false" atom, depending on `v`
 - `Builder& nullValue()` — Adds the "null" atom
+
+#### Managing the result
+
 - `size_t size() const` — Number of readable bytes at the pointer returned by `bytes()`
 - `const char* bytes() const` — Pointer to the backing buffer, holding the resulting JSON.
 - `std::string toString() const` — Return a `std::string` object holding a copy of the backing buffer, representing the JSON.
 - `const char* seizeBytes(size_t& size_out)` — "Steal" the backing buffer. After this call, the caller is responsible for calling `free()` on the returned pointer. Returns NULL on failure. Sets the value of `size_out` to the number of readable bytes at the returned pointer. The builder will be reset and ready to use (which will act on a new backing buffer).
-- `const void reset()` — Reset the builder to its neutral state. Note that the backing buffer is reused in this case.
-
-### class Error
-
-Represents an unrecoverable error
-
-- `Error(const std::string& msg)` — Initialize a new error
 
 ### enum Token
 
@@ -115,6 +139,7 @@ Represents an unrecoverable error
 - `Float` —         number value with a fraction part (access as double through `Tokenizer::floatValue()`)
 - `String` —        string value (access value through `Tokenizer::stringValue()` et al)
 - `FieldName` —     field name (access value through `Tokenizer::stringValue()` et al)
+- `Error` —         an error occured (access error code through `Tokenizer::error()` et al)
 
 ### enum TextEncoding
 
