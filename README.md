@@ -27,6 +27,9 @@ jsont::Token token;
 while ((token = S.next())) {
   if (token == jsont::Float) {
     printf("%g\n", S.floatValue());
+  } ... else if (t == jsont::Error) {
+    // handle error
+    break;
   }
 }
 ```

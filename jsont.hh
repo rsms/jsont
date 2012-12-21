@@ -38,6 +38,7 @@ typedef enum {
   Float,         // number value with a fraction part
   String,        // string value
   FieldName,     // field name
+  Error,         // An error occured (see `error()` for details)
   _Comma,
 } Token;
 
@@ -45,13 +46,6 @@ typedef enum {
 typedef enum {
   UTF8TextEncoding = 0,
 } TextEncoding;
-
-// Represents an unrecoverable error
-class Error : public std::runtime_error {
-public:
-  explicit Error(const std::string& msg)
-    : std::runtime_error::runtime_error(msg) {}
-};
 
 class TokenizerInternal;
 
@@ -62,7 +56,7 @@ public:
   ~Tokenizer();
 
   // Read next token
-  const Token& next() throw(Error);
+  const Token& next();
 
   // Access current token
   const Token& current() const;
@@ -87,11 +81,35 @@ public:
   // Returns the current value as a signed 64-bit integer.
   int64_t intValue() const;
 
+  // Error codes
+  typedef enum {
+    UnspecifiedError = 0,
+    UnexpectedComma,
+    UnexpectedTrailingComma,
+    InvalidByte,
+    PrematureEndOfInput,
+    MalformedUnicodeEscapeSequence,
+    MalformedNumberLiteral,
+    UnterminatedString,
+    SyntaxError,
+  } ErrorCode;
+
+  // Returns the error code of the last error
+  ErrorCode error() const;
+
+  // Returns a human-readable message for the last error. Never returns NULL.
+  const char* errorMessage() const;
+
+  // The byte offset into input where the tokenizer is currently looking. In the
+  // event of an error, this will point to the source of the error.
+  size_t inputOffset() const;
+
   friend class TokenizerInternal;
 private:
   size_t availableInput() const;
   size_t endOfInput() const;
   const Token& setToken(Token t);
+  const Token& setError(ErrorCode error);
 
   struct {
     const uint8_t* bytes;
@@ -107,6 +125,9 @@ private:
     bool buffered; // if true, contents lives in buffer
   } _value;
   Token _token;
+  struct {
+    ErrorCode code;
+  } _error;
 };
 
 
@@ -197,11 +218,22 @@ inline size_t Tokenizer::endOfInput() const {
 inline const Token& Tokenizer::setToken(Token t) {
   return _token = t;
 }
+inline const Token& Tokenizer::setError(Tokenizer::ErrorCode error) {
+  _error.code = error;
+  return _token = Error;
+}
+inline size_t Tokenizer::inputOffset() const {
+  return _input.offset;
+}
 
 inline void Tokenizer::Value::beginAtOffset(size_t z) {
   offset = z;
   length = 0;
   buffered = false;
+}
+
+inline Tokenizer::ErrorCode Tokenizer::error() const {
+  return _error.code;
 }
 
 

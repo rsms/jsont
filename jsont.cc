@@ -31,6 +31,7 @@ static uint64_t _xtou64(const uint8_t* bytes, size_t len) {
   return value;
 }
 
+
 #ifdef NAN
   #define _JSONT_NAN NAN
 #else
@@ -45,11 +46,11 @@ public:
   }
 
   inline static const Token& readAtom(Tokenizer& self, const char* str,
-        size_t len, const Token& token) throw(Error) {
+        size_t len, const Token& token) {
     if (self.availableInput() < len) {
-      throw Error("premature end of input");
+      return self.setError(Tokenizer::PrematureEndOfInput);
     } else if (memcmp(currentInput(self), str, len) != 0) {
-      throw Error("invalid input (unexpected keyword)");
+      return self.setError(Tokenizer::InvalidByte);
     } else {
       self._input.offset += len;
       return self.setToken(token);
@@ -66,6 +67,31 @@ void Tokenizer::reset(const uint8_t* bytes, size_t length, TextEncoding encoding
   _input.bytes = bytes;
   _input.length = length;
   _input.offset = 0;
+  _error.code = UnspecifiedError;
+}
+
+
+const char* Tokenizer::errorMessage() const {
+  switch (_error.code) {
+    case UnexpectedComma:
+      return "Unexpected comma";
+    case UnexpectedTrailingComma:
+      return "Unexpected trailing comma";
+    case InvalidByte:
+      return "Invalid input byte";
+    case PrematureEndOfInput:
+      return "Premature end of input";
+    case MalformedUnicodeEscapeSequence:
+      return "Malformed Unicode escape sequence";
+    case MalformedNumberLiteral:
+      return "Malformed number literal";
+    case UnterminatedString:
+      return "Unterminated string";
+    case SyntaxError:
+      return "Illegal JSON (syntax error)";
+    default:
+      return "Unspecified error";
+  }
 }
 
 
@@ -145,7 +171,7 @@ int64_t Tokenizer::intValue() const {
 }
 
 
-const Token& Tokenizer::next() throw(Error) {
+const Token& Tokenizer::next() {
   //
   // { } [ ] n t f "
   //         | | | |
@@ -158,9 +184,16 @@ const Token& Tokenizer::next() throw(Error) {
     uint8_t b = _input.bytes[_input.offset++];
     switch (b) {
       case '{': return setToken(ObjectStart);
-      case '}': return setToken(ObjectEnd);
+      case '}': {
+        if (_token == _Comma) { return setError(UnexpectedTrailingComma); }
+        return setToken(ObjectEnd);
+      }
+
       case '[': return setToken(ArrayStart);
-      case ']': return setToken(ArrayEnd);
+      case ']': {
+        if (_token == _Comma) { return setError(UnexpectedTrailingComma); }
+        return setToken(ArrayEnd);
+      }
 
       case 'n':
         return TokenizerInternal::readAtom(*this, "ull", 3, jsont::Null);
@@ -174,22 +207,18 @@ const Token& Tokenizer::next() throw(Error) {
         break;
 
       case 0:
-        throw Error("invalid input (null byte)");
+        return setError(InvalidByte);
 
       // when we read a value, we don't produce a token until we either reach
       // end of input, a colon (then the value is a field name), a comma, or an
       // array or object terminator.
 
       case '"': {
-        //printf(">> start of string at %zu\n", _input.offset);
         _value.beginAtOffset(_input.offset);
 
         while (!endOfInput()) {
           b = _input.bytes[_input.offset++];
           assert(_input.offset < _input.length);
-
-          //printf("_input.bytes => %p\n", _input.bytes);
-          //printf(">> _input.bytes[%zu] => '%c' (%u)\n", _input.offset, b, b);
           
           switch (b) {
 
@@ -197,7 +226,6 @@ const Token& Tokenizer::next() throw(Error) {
               // We must go buffered since the input segment != value
               if (!_value.buffered) {
                 _value.buffered = true;
-                //_value.buffer.clear();
                 _value.buffer.assign(
                   (const char*)(_input.bytes+_value.offset),
                   _input.offset - _value.offset - 1
@@ -205,8 +233,7 @@ const Token& Tokenizer::next() throw(Error) {
               }
 
               if (endOfInput()) {
-                throw Error(
-                  "premature end of input while reading escaped sequence");
+                return setError(PrematureEndOfInput);
               }
               
               b = _input.bytes[_input.offset++];
@@ -217,16 +244,16 @@ const Token& Tokenizer::next() throw(Error) {
                 case 'r': _value.buffer.append(1, '\x0D'); break;
                 case 't': _value.buffer.append(1, '\x09'); break;
                 case 'u': {
-                  // todo
+                  // \uxxxx
                   if (availableInput() < 4) {
-                    throw Error("premature end of input");
+                    return setError(PrematureEndOfInput);
                   }
                   uint64_t utf16cp =
                     _xtou64(TokenizerInternal::currentInput(*this), 4);
                   _input.offset += 4;
 
                   if (utf16cp > 0xffff) {
-                    throw Error("Malformed Unicode escape sequence in string");
+                    return setError(MalformedUnicodeEscapeSequence);
                   }
 
                   uint16_t cp = (uint16_t)(0xffff & utf16cp);
@@ -264,20 +291,19 @@ const Token& Tokenizer::next() throw(Error) {
 
                   break;
                 }
-                default:  _value.buffer.append(1, (char)b); break;
+                default:
+                  _value.buffer.append(1, (char)b); break;
               }
               break;
             }
 
-            case '"': {
+            case '"':
               goto after_initial_read_b;
-            }
 
             case 0:
-              throw Error("invalid input (null byte)");
+              return setError(InvalidByte);
 
             default: {
-              //printf("Append '%c' (%d)\n", (char)b, b);
               if (_value.buffered) {
                 // TODO: Make this efficient by appending chunks between
                 // boundaries instead of appending per-byte
@@ -290,7 +316,7 @@ const Token& Tokenizer::next() throw(Error) {
 
         after_initial_read_b:
         if (b != '"') {
-          throw Error("premature end of input (unterminated string)");
+          return setError(UnterminatedString);
         }
 
         if (!_value.buffered) {
@@ -303,22 +329,28 @@ const Token& Tokenizer::next() throw(Error) {
           switch (b) {
             case ' ': case '\t': case '\r': case '\n': break;
             case ':': return setToken(FieldName);
-            case ',': return setToken(jsont::String);
-            case 0:   throw Error("invalid input (null byte)");
-            default: {
+            case ',': goto string_read_return_string;
+            case ']': case '}': {
               --_input.offset; // rewind
-              throw Error("Invalid syntax (no comma after string value)");
+              goto string_read_return_string;
+            }
+            case 0: return setError(InvalidByte);
+            default: {
+              // Expected a comma or a colon
+              return setError(SyntaxError);
             }
           }
         }
 
+        string_read_return_string:
         return setToken(jsont::String);
       }
 
       case ',': {
-        if (_token == ObjectStart || _token == ArrayStart) {
-          throw Error("unexpected comma in input");
+        if (_token == ObjectStart || _token == ArrayStart || _token == _Comma) {
+          return setError(UnexpectedComma);
         }
+        _token = _Comma;
         break;
       }
 
@@ -335,16 +367,15 @@ const Token& Tokenizer::next() throw(Error) {
               case '.': token = jsont::Float; break;
               case 'E': case 'e': case '-': case '+': {
                 if (token != jsont::Float) {
-                  throw Error("Invalid number literal");
+                  return setError(MalformedNumberLiteral);
                 }
                 break;
               }
               default: {
-                //--_input.offset;
                 if ( (_input.offset - _value.offset == 1) &&
                      (_input.bytes[_value.offset] == '-' || 
                       _input.bytes[_value.offset] == '+') ) {
-                  throw Error("Invalid number literal");
+                  return setError(MalformedNumberLiteral);
                 }
                 _value.length = _input.offset - _value.offset - 1;
                 return setToken(token);
@@ -353,7 +384,7 @@ const Token& Tokenizer::next() throw(Error) {
           }
           return setToken(End);
         } else {
-          throw Error("Invalid input character");
+          return setError(InvalidByte);
         }
       }
     }
@@ -403,8 +434,7 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
   reserve(length + 2);
   _buf[_size++] = '"';
 
-  // Currently only UTF-8 is supported
-  assert(encoding == UTF8TextEncoding);
+  assert(encoding == UTF8TextEncoding /* Currently only UTF-8 is supported */);
 
   const uint8_t* end = v+length;
   while (v != end) {
@@ -415,7 +445,7 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         break;
       case kUTF8ByteEncode1: {
         assert(*v < 16);
-        reserve(5); // 5 additional bytes needed
+        reserve(5); // five additional bytes needed
         _buf[_size] = '\\';
         _buf[++_size] = 'u';
         _buf[++_size] = '0';
@@ -430,7 +460,7 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         // an affect of the kUTF8ByteTable lookup table and this code needs to
         // be revised if the lookup table adds or removes any kUTF8ByteEncode.
         assert((*v > 15 && *v < 32) || *v == 127);
-        reserve(5);
+        reserve(5); // five additional bytes needed
         _buf[_size] = '\\';
         _buf[++_size] = 'u';
         _buf[++_size] = '0';
@@ -445,7 +475,7 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
       }
       default:
         // reverse solidus escape
-        reserve(1);
+        reserve(1); // one additional bytes needed
         _buf[_size++] = '\\';
         _buf[_size++] = s;
         break;
