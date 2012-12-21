@@ -83,7 +83,27 @@ Reads a sequence of bytes and produces tokens and values while doing so.
 - `const char* errorMessage() const` — Returns a human-readable message for the last error. Never returns NULL.
 - `size_t inputOffset() const` — The byte offset into input where the tokenizer is currently looking. In the event of an error, this will point to the source of the error.
 
-##### enum ErrorCode
+### enum Token
+
+- `End` —           Input ended
+- `ObjectStart` —   {
+- `ObjectEnd` —     }
+- `ArrayStart` —    [
+- `ArrayEnd` —      ]
+- `True` —          true
+- `False` —         false
+- `Null` —          null
+- `Integer` —       number value without a fraction part (access as int64 through `Tokenizer::intValue()`)
+- `Float` —         number value with a fraction part (access as double through `Tokenizer::floatValue()`)
+- `String` —        string value (access value through `Tokenizer::stringValue()` et al)
+- `FieldName` —     field name (access value through `Tokenizer::stringValue()` et al)
+- `Error` —         an error occured (access error code through `Tokenizer::error()` et al)
+
+### enum TextEncoding
+
+- `UTF8TextEncoding` — Unicode UTF-8 text encoding
+
+### enum Tokenizer::ErrorCode
 
 - `UnspecifiedError` — Unspecified error
 - `UnexpectedComma` — Unexpected comma
@@ -124,26 +144,6 @@ Aids in building JSON, providing a final sequential byte buffer.
 - `const char* bytes() const` — Pointer to the backing buffer, holding the resulting JSON.
 - `std::string toString() const` — Return a `std::string` object holding a copy of the backing buffer, representing the JSON.
 - `const char* seizeBytes(size_t& size_out)` — "Steal" the backing buffer. After this call, the caller is responsible for calling `free()` on the returned pointer. Returns NULL on failure. Sets the value of `size_out` to the number of readable bytes at the returned pointer. The builder will be reset and ready to use (which will act on a new backing buffer).
-
-### enum Token
-
-- `End` —           Input ended
-- `ObjectStart` —   {
-- `ObjectEnd` —     }
-- `ArrayStart` —    [
-- `ArrayEnd` —      ]
-- `True` —          true
-- `False` —         false
-- `Null` —          null
-- `Integer` —       number value without a fraction part (access as int64 through `Tokenizer::intValue()`)
-- `Float` —         number value with a fraction part (access as double through `Tokenizer::floatValue()`)
-- `String` —        string value (access value through `Tokenizer::stringValue()` et al)
-- `FieldName` —     field name (access value through `Tokenizer::stringValue()` et al)
-- `Error` —         an error occured (access error code through `Tokenizer::error()` et al)
-
-### enum TextEncoding
-
-- `UTF8TextEncoding` — Unicode UTF-8 text encoding
 
 ----
 
