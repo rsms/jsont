@@ -56,8 +56,8 @@ namespace `jsont`
 
 Reads a sequence of bytes and produces tokens and values while doing so.
 
-- `Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `enc`
-- `const Token& next()` — Read next token
+- `Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `encoding`
+- `const Token& next() throw(Error)` — Read next token, possibly throwing an `Error`
 - `const Token& current() const` — Access current token
 - `void reset(const uint8_t* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
 - `bool hasValue() const` — True if the current token has a value
