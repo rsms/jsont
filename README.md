@@ -51,9 +51,7 @@ std::cout << json.toString() << std::endl;
 
 See `jsont.h` and `jsont.hh` for a complete overview of the API, incuding more detailed documentation. Here's an overview:
 
-## C++ API
-
-namespace `jsont`
+## C++ API `namespace jsont`
 
 - `Builder build()` — convenience builder factory
 
