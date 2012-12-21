@@ -29,7 +29,9 @@ while ((token = S.next())) {
     printf("%g\n", S.floatValue());
   }
 }
+```
 
+```cc
 jsont::Builder json;
 json.startObject()
     .fieldName("foo").value(123.45)
