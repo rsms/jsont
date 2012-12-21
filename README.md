@@ -1,6 +1,6 @@
 # JSON Tokenizer (jsont)
 
-A minimal and portable JSON tokenizer written in standard C++. Performs validating and highly efficient parsing suitable for reading JSON directly into custom data structures. There are no code dependencies — simply include `jsont.{h,hh,c,cc}` in your project.
+A minimal and portable JSON tokenizer written in standard C and C++ (two separate versions). Performs validating and highly efficient parsing suitable for reading JSON directly into custom data structures. There are no code dependencies — simply include `jsont.{h,hh,c,cc}` in your project.
 
 Build and run unit tests:
 
