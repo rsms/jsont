@@ -52,7 +52,7 @@ class TokenizerInternal;
 // Reads a sequence of bytes and produces tokens and values while doing so
 class Tokenizer {
 public:
-  Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding);
+  Tokenizer(const char* bytes, size_t length, TextEncoding encoding);
   ~Tokenizer();
 
   // Read next token
@@ -63,14 +63,14 @@ public:
 
   // Reset the tokenizer, making it possible to reuse this parser so to avoid
   // unnecessary memory allocation and deallocation.
-  void reset(const uint8_t* bytes, size_t length, TextEncoding encoding);
+  void reset(const char* bytes, size_t length, TextEncoding encoding);
 
   // True if the current token has a value
   bool hasValue() const;
 
   // Returns a slice of the input which represents the current value, or nothing
   // (returns 0) if the current token has no value (e.g. start of an object).
-  size_t dataValue(const uint8_t const** bytes) const;
+  size_t dataValue(const char const** bytes) const;
 
   // Returns a *copy* of the current string value.
   std::string stringValue() const;
@@ -103,6 +103,12 @@ public:
   // The byte offset into input where the tokenizer is currently looking. In the
   // event of an error, this will point to the source of the error.
   size_t inputOffset() const;
+
+  // Total number of input bytes
+  size_t inputSize() const;
+
+  // A pointer to the input data as passed to `reset` or the constructor.
+  const char* inputBytes() const;
 
   friend class TokenizerInternal;
 private:
@@ -192,7 +198,7 @@ inline Builder build() { return Builder(); }
 
 // ------------------- internal ---------------------
 
-inline Tokenizer::Tokenizer(const uint8_t* bytes, size_t length,
+inline Tokenizer::Tokenizer(const char* bytes, size_t length,
     TextEncoding encoding) : _token(End) {
   reset(bytes, length, encoding);
 }
@@ -204,9 +210,9 @@ inline bool Tokenizer::hasValue() const {
 }
 
 inline std::string Tokenizer::stringValue() const {
-  const uint8_t* bytes;
+  const char* bytes;
   size_t size = dataValue(&bytes);
-  return std::string((const char*)bytes, size);
+  return std::string(bytes, size);
 }
 
 inline size_t Tokenizer::availableInput() const {
@@ -224,6 +230,12 @@ inline const Token& Tokenizer::setError(Tokenizer::ErrorCode error) {
 }
 inline size_t Tokenizer::inputOffset() const {
   return _input.offset;
+}
+inline size_t Tokenizer::inputSize() const {
+  return _input.length;
+}
+inline const char* Tokenizer::inputBytes() const {
+  return (const char*)_input.bytes;
 }
 
 inline void Tokenizer::Value::beginAtOffset(size_t z) {
@@ -360,53 +372,21 @@ inline const void Builder::reset() {
   _state = NeutralState;
 }
 
-#if JSONT_CXX_RVALUE_REFS
-  // Move constructor and assignment operator
-  inline Builder::Builder(Builder&& other)
-      : _buf(other._buf)
-      , _capacity(other._capacity)
-      , _size(other._size)
-      , _state(other._state) {
-    other._buf = 0;
-  }
-
-  inline Builder& Builder::operator=(Builder&& other) {
-    _buf = other._buf; other._buf = 0;
-    _capacity = other._capacity;
-    _size = other._size;
-    _state = other._state;
-    return *this;
-  }
-#endif
-
-inline Builder::Builder(const Builder& other)
-    : _buf(0)
-    , _capacity(other._capacity)
-    , _size(other._size)
-    , _state(other._state) {
-  _buf = (char*)malloc(_capacity);
-  memcpy((void*)_buf, (const void*)other._buf, _size);
-}
-
-inline Builder& Builder::operator=(const Builder& other) {
-  _capacity = other._capacity;
-  _size = other._size;
-  _state = other._state;
-  _buf = (char*)malloc(_capacity);
-  memcpy((void*)_buf, (const void*)other._buf, _size);
-  return *this;
-}
-
-// -- private visibility --
-
 inline size_t Builder::available() const {
   return _capacity - _size;
 }
 
 inline void Builder::reserve(size_t size) {
   if (available() < size) {
-    _capacity = _capacity + size - available();
+    #if 0
+    // exact allocation for debugging purposes
+    printf("DEBUG Builder::reserve: size=%zu available=%zu grow_by=%zu\n",
+      size, available(), (size - available()) );
+    _capacity += size - available();
+    #else
+    _capacity += size - available();
     _capacity = (_capacity < 64) ? 64 : (_capacity * 1.5);
+    #endif
     _buf = (char*)realloc((void*)_buf, _capacity);
   }
 }

@@ -62,9 +62,9 @@ public:
 Tokenizer::~Tokenizer() {}
 
 
-void Tokenizer::reset(const uint8_t* bytes, size_t length, TextEncoding encoding) {
+void Tokenizer::reset(const char* bytes, size_t length, TextEncoding encoding) {
   assert(encoding == UTF8TextEncoding); // only supported encoding
-  _input.bytes = bytes;
+  _input.bytes = (const uint8_t*)bytes;
   _input.length = length;
   _input.offset = 0;
   _error.code = UnspecifiedError;
@@ -95,13 +95,13 @@ const char* Tokenizer::errorMessage() const {
 }
 
 
-size_t Tokenizer::dataValue(const uint8_t const** bytes) const {
+size_t Tokenizer::dataValue(const char const** bytes) const {
   if (!hasValue()) { return 0; }
   if (_value.buffered) {
-    *bytes = (const uint8_t const*)_value.buffer.data();
+    *bytes = (const char const*)_value.buffer.data();
     return _value.buffer.size();
   } else {
-    *bytes = (const uint8_t const*)(_input.bytes + _value.offset);
+    *bytes = (const char const*)(_input.bytes + _value.offset);
     return _value.length;
   }
 }
@@ -248,6 +248,7 @@ const Token& Tokenizer::next() {
                   if (availableInput() < 4) {
                     return setError(PrematureEndOfInput);
                   }
+
                   uint64_t utf16cp =
                     _xtou64(TokenizerInternal::currentInput(*this), 4);
                   _input.offset += 4;
@@ -445,7 +446,8 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         break;
       case kUTF8ByteEncode1: {
         assert(*v < 16);
-        reserve(5); // five additional bytes needed
+        size_t remainingSize = end-v+1+5; // five additional bytes needed
+        reserve(remainingSize);
         _buf[_size] = '\\';
         _buf[++_size] = 'u';
         _buf[++_size] = '0';
@@ -453,6 +455,7 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         _buf[++_size] = '0';
         _buf[++_size] = *v + (*v > 10 ? 55 : 48); // A-F : 0-9
         ++_size;
+        assert(_size <= _capacity);
         break;
       }
       case kUTF8ByteEncode2: {
@@ -460,7 +463,8 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         // an affect of the kUTF8ByteTable lookup table and this code needs to
         // be revised if the lookup table adds or removes any kUTF8ByteEncode.
         assert((*v > 15 && *v < 32) || *v == 127);
-        reserve(5); // five additional bytes needed
+        size_t remainingSize = end-v+1+5; // five additional bytes needed
+        reserve(remainingSize);
         _buf[_size] = '\\';
         _buf[++_size] = 'u';
         _buf[++_size] = '0';
@@ -471,13 +475,16 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
         _buf[++_size] = b1 + (b1 > 10 ? 55 : 48); // A-F : 0-9
         _buf[++_size] = b2 + (b2 > 10 ? 55 : 48); // A-F : 0-9
         ++_size;
+        assert(_size <= _capacity);
         break;
       }
       default:
         // reverse solidus escape
-        reserve(1); // one additional bytes needed
+        size_t remainingSize = end-v+1+1; // one additional byte needed
+        reserve(remainingSize);
         _buf[_size++] = '\\';
         _buf[_size++] = s;
+        assert(_size <= _capacity);
         break;
     }
 
@@ -485,6 +492,44 @@ Builder& Builder::appendString(const uint8_t* v, size_t length, TextEncoding enc
   }
 
   _buf[_size++] = '"';
+  assert(_size <= _capacity);
+  return *this;
+}
+
+#if JSONT_CXX_RVALUE_REFS
+  // Move constructor and assignment operator
+  Builder::Builder(Builder&& other)
+      : _buf(other._buf)
+      , _capacity(other._capacity)
+      , _size(other._size)
+      , _state(other._state) {
+    other._buf = 0;
+  }
+
+  Builder& Builder::operator=(Builder&& other) {
+    _buf = other._buf; other._buf = 0;
+    _capacity = other._capacity;
+    _size = other._size;
+    _state = other._state;
+    return *this;
+  }
+#endif
+
+Builder::Builder(const Builder& other)
+    : _buf(0)
+    , _capacity(other._capacity)
+    , _size(other._size)
+    , _state(other._state) {
+  _buf = (char*)malloc(_capacity);
+  memcpy((void*)_buf, (const void*)other._buf, _size);
+}
+
+Builder& Builder::operator=(const Builder& other) {
+  _capacity = other._capacity;
+  _size = other._size;
+  _state = other._state;
+  _buf = (char*)malloc(_capacity);
+  memcpy((void*)_buf, (const void*)other._buf, _size);
   return *this;
 }
 

@@ -59,8 +59,8 @@ See `jsont.h` and `jsont.hh` for a complete overview of the API, incuding more d
 
 Reads a sequence of bytes and produces tokens and values while doing so.
 
-- `Tokenizer(const uint8_t* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `encoding`
-- `void reset(const uint8_t* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
+- `Tokenizer(const char* bytes, size_t length, TextEncoding encoding)` — initialize a new Tokenizer to read `bytes` of `length` in `encoding`
+- `void reset(const char* bytes, size_t length, TextEncoding encoding)` — Reset the tokenizer, making it possible to reuse this parser so to avoid unnecessary memory allocation and deallocation.
 
 #### Reading tokens
 
@@ -70,7 +70,7 @@ Reads a sequence of bytes and produces tokens and values while doing so.
 #### Reading values
 
 - `bool hasValue() const` — True if the current token has a value
-- `size_t dataValue(const uint8_t const** bytes)` — Returns a slice of the input which represents the current value, or nothing (returns 0) if the current token has no value (e.g. start of an object).
+- `size_t dataValue(const char const** bytes)` — Returns a slice of the input which represents the current value, or nothing (returns 0) if the current token has no value (e.g. start of an object).
 - `std::string stringValue() const` — Returns a *copy* of the current string value.
 - `double floatValue() const` — Returns the current value as a double-precision floating-point number.
 - `int64_t intValue() const` — Returns the current value as a signed 64-bit integer.
@@ -79,7 +79,12 @@ Reads a sequence of bytes and produces tokens and values while doing so.
 
 - `ErrorCode error() const` — Returns the error code of the last error
 - `const char* errorMessage() const` — Returns a human-readable message for the last error. Never returns NULL.
-- `size_t inputOffset() const` — The byte offset into input where the tokenizer is currently looking. In the event of an error, this will point to the source of the error.
+
+#### Acessing underlying input buffer
+
+- `const char* inputBytes() const` — A pointer to the input data as passed to `reset` or the constructor.
+- `size_t inputSize() const` — Total number of input bytes
+- `size_t inputOffset() const` — The byte offset into input where the tokenizer is currently at. In the event of an error, this will point to the source of the error.
 
 ### enum Token
 
