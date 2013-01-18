@@ -39,6 +39,25 @@ static uint64_t _xtou64(const uint8_t* bytes, size_t len) {
 #endif
 
 
+const char* token_name(jsont::Token tok) {
+  switch (tok) {
+    case End:         return "End";
+    case ObjectStart: return "ObjectStart";
+    case ObjectEnd:   return "ObjectEnd";
+    case ArrayStart:  return "ArrayStart";
+    case ArrayEnd:    return "ArrayEnd";
+    case True:        return "True";
+    case False:       return "False";
+    case Null:        return "Null";
+    case Integer:     return "Integer";
+    case Float:       return "Float";
+    case String:      return "String";
+    case FieldName:   return "FieldName";
+    default:                 return "?";
+  }
+}
+
+
 class TokenizerInternal {
 public:
   inline static const uint8_t* currentInput(const Tokenizer& self) {

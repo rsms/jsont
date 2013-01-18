@@ -47,6 +47,9 @@ typedef enum {
   UTF8TextEncoding = 0,
 } TextEncoding;
 
+// Name of `token`
+const char* token_name(jsont::Token token);
+
 class TokenizerInternal;
 
 // Reads a sequence of bytes and produces tokens and values while doing so
