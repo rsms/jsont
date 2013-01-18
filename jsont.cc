@@ -380,6 +380,14 @@ const Token& Tokenizer::next() {
                       _input.bytes[_value.offset] == '+') ) {
                   return setError(MalformedNumberLiteral);
                 }
+
+                // if we got terminated by a comma, set tok. else rewind
+                if (b == ',') {
+                  _token = _Comma;
+                } else {
+                  --_input.offset;
+                }
+
                 _value.length = _input.offset - _value.offset - 1;
                 return setToken(token);
               }
