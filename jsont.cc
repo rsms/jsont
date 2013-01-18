@@ -68,6 +68,8 @@ void Tokenizer::reset(const char* bytes, size_t length, TextEncoding encoding) {
   _input.length = length;
   _input.offset = 0;
   _error.code = UnspecifiedError;
+  // Advance to first token
+  next();
 }
 
 
