@@ -400,12 +400,8 @@ const Token& Tokenizer::next() {
                   return setError(MalformedNumberLiteral);
                 }
 
-                // if we got terminated by a comma, set tok. else rewind
-                if (b == ',') {
-                  _token = _Comma;
-                } else {
-                  --_input.offset;
-                }
+                // rewind the byte that terminated this number literal
+                --_input.offset;
 
                 _value.length = _input.offset - _value.offset - 1;
                 return setToken(token);
