@@ -84,6 +84,9 @@ public:
   // Returns the current value as a signed 64-bit integer.
   int64_t intValue() const;
 
+  // Returns the current value as a boolean
+  bool boolValue() const;
+
   // Error codes
   typedef enum {
     UnspecifiedError = 0,
@@ -216,6 +219,10 @@ inline std::string Tokenizer::stringValue() const {
   const char* bytes;
   size_t size = dataValue(&bytes);
   return std::string(bytes, size);
+}
+
+inline bool Tokenizer::boolValue() const {
+  return _token == True;
 }
 
 inline size_t Tokenizer::availableInput() const {
