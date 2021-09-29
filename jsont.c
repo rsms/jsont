@@ -74,7 +74,7 @@ unsigned long _hex_str_to_ul(const uint8_t* bytes, size_t len) {
   for (size_t i = 0; i != len; ++i) {
     uint8_t b = bytes[i];
     int digit = (b > '0'-1 && b < 'f'+1) ? kHexValueTable[b-'0'] : -1;
-    if (b == -1 || // bad digit
+    if (digit == -1 || // bad digit
         (value > cutoff) || // overflow
         ((value == cutoff) && (digit > cutoff_digit)) ) {
       return ULONG_MAX;
