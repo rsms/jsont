@@ -172,9 +172,13 @@ bool jsont_data_equals(jsont_ctx_t* ctx, const uint8_t* bytes, size_t length) {
       (memcmp((const void*)ctx->value_buf.data,
         (const void*)bytes, length) == 0);
   } else {
-    return (ctx->input_buf_value_end - ctx->input_buf_value_start == length) &&
-      (memcmp((const void*)ctx->input_buf_value_start,
-        (const void*)bytes, length) == 0);
+    size_t value_length =
+      ctx->input_buf_value_end - ctx->input_buf_value_start;
+    if (value_length != length) {
+      return 0;
+    }
+    return (memcmp((const void*)ctx->input_buf_value_start,
+                   (const void*)bytes, length) == 0);
   }
 }
 
