@@ -81,7 +81,7 @@ int main(void) {
   // Expect the string '\u2192' (RIGHTWARDS ARROW, UTF8: E2,86,92)
   assert(jsont_next(S) == JSONT_STRING);
   assert(jsont_str_equals(S, "\xe2\x86\x92") == true);
-  
+
   // Expect a field name 'n'
   jsont_next(S);
   JSONT_ASSERT_FIELD_NAME("n");

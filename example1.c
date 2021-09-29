@@ -37,7 +37,7 @@ int main(void) {
     } else if (tok == JSONT_NUMBER_FLOAT) {
       printf(" %f", jsont_float_value(S));
     }
-    
+
     printf("\n");
   }
 

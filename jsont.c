@@ -570,4 +570,3 @@ jsont_tok_t jsont_next(jsont_ctx_t* ctx) {
     }
   } // while (1)
 }
-

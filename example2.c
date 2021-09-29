@@ -58,7 +58,7 @@ typedef struct my_response {
 bool my_user_build(jsont_ctx_t* S, my_user_t* obj) {
   jsont_tok_t tok = jsont_current(S);
   if (tok != JSONT_OBJECT_START) return false;
-  
+
   // for each field
   while ((tok = jsont_next(S)) == JSONT_FIELD_NAME) {
     const uint8_t* fieldname = 0;
@@ -67,7 +67,7 @@ bool my_user_build(jsont_ctx_t* S, my_user_t* obj) {
     if (memcmp("id", fieldname, len) == 0) {
       MY_NEXT_EXPECT(S, JSONT_STRING);
       obj->id = jsont_strcpy_value(S);
-    
+
     } else if (memcmp("name", fieldname, len) == 0) {
       MY_NEXT_EXPECT(S, JSONT_STRING);
       obj->name = jsont_strcpy_value(S);
@@ -119,7 +119,7 @@ bool my_response_build(jsont_ctx_t* S, my_response_t* obj) {
       return false;
     }
   }
-  
+
   return true;
 }
 
