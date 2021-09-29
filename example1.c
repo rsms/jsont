@@ -8,7 +8,7 @@
 
 static const char* _tok_name(jsont_tok_t tok);
 
-int main(int argc, const char** argv) {
+int main(void) {
   // Create a new reusable tokenizer
   jsont_ctx_t* S = jsont_create(0);
 

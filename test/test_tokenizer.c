@@ -10,7 +10,7 @@
     strlen(fieldName)) == true); \
 } while(0)
 
-int main(int argc, const char** argv) {
+int main(void) {
   // Create a new reusable tokenizer
   jsont_ctx_t* S = jsont_create(0);
 
