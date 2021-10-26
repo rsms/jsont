@@ -45,6 +45,9 @@ typedef uint8_t jsont_tok_t;
 
 typedef struct jsont_ctx {
   void* user_data;
+  void * (*lalloc)(void * user_data, size_t size);
+  void * (*lrealloc)(void * user_data, void * p, size_t size);
+  void (*lfree)(void * user_data, void * p);
   const uint8_t* input_buf;
   const uint8_t* input_buf_ptr;
   size_t input_len;
@@ -86,18 +89,47 @@ unsigned long _hex_str_to_ul(const uint8_t* bytes, size_t len) {
   return value;
 }
 
-jsont_ctx_t* jsont_create(void* user_data) {
-  jsont_ctx_t* ctx = (jsont_ctx_t*)calloc(1, sizeof(jsont_ctx_t));
+static void * lalloc(void * ign, size_t size) {
+    (void)ign; // unused
+	return malloc(size);
+}
+
+static void * lrealloc(void * ign, void *p, size_t size) {
+    (void)ign; // unused
+	return realloc(p, size);
+}
+
+static void lfree(void * ign, void *p) {
+    (void)ign; // unused
+	free(p);
+}
+
+
+jsont_ctx_t* jsont_create_alloc(
+		void* user_data,
+		void * (*lalloc)(void * user_data, size_t size),
+		void * (*lrealloc)(void * user_data, void * p, size_t size),
+		void (*lfree)(void * user_data, void * p)) {
+  jsont_ctx_t* ctx = (jsont_ctx_t*)lalloc(user_data, sizeof(jsont_ctx_t));
+  memset(ctx, 0, sizeof(jsont_ctx_t));
   ctx->user_data = user_data;
+  ctx->lalloc = lalloc;
+  ctx->lrealloc = lrealloc;
+  ctx->lfree = lfree;
   ctx->st_stack_size = _STRUCT_TYPE_STACK_SIZE;
   return ctx;
 }
 
+jsont_ctx_t* jsont_create(void* user_data) {
+	return jsont_create_alloc(user_data, lalloc, lrealloc, lfree);
+}
+
+
 void jsont_destroy(jsont_ctx_t* ctx) {
   if (ctx->value_buf.data != 0) {
-    free(ctx->value_buf.data);
+    ctx->lfree(ctx->user_data, ctx->value_buf.data);
   }
-  free(ctx);
+  ctx->lfree(ctx->user_data, ctx);
 }
 
 void jsont_reset(jsont_ctx_t* ctx, const uint8_t* bytes, size_t length) {
@@ -188,7 +220,7 @@ char* jsont_strcpy_value(jsont_ctx_t* ctx) {
   } else {
     const uint8_t* bytes = 0;
     size_t len = jsont_data_value(ctx, &bytes);
-    char* buf = (char*)malloc(len+1);
+    char* buf = (char*)ctx->lalloc(ctx->user_data, len+1);
     if (memcpy((void*)buf, (const void*)bytes, len) != buf) {
       return 0;
     }
@@ -355,14 +387,14 @@ static void _value_buf_append(jsont_ctx_t* ctx, const uint8_t* data, size_t len)
     if (ctx->value_buf.size < _VALUE_BUF_MIN_SIZE) {
       ctx->value_buf.size = _VALUE_BUF_MIN_SIZE;
     }
-    ctx->value_buf.data = (uint8_t*)malloc(ctx->value_buf.size);
+    ctx->value_buf.data = (uint8_t*)ctx->lalloc(ctx->user_data, ctx->value_buf.size);
     if (len != 0) {
       memcpy(ctx->value_buf.data, data, len);
     }
   } else {
     if (ctx->value_buf.length + len > ctx->value_buf.size) {
       size_t new_size = ctx->value_buf.size + (len * 2);
-      ctx->value_buf.data = realloc(ctx->value_buf.data, new_size);
+      ctx->value_buf.data = ctx->lrealloc(ctx->user_data, ctx->value_buf.data, new_size);
       assert(ctx->value_buf.data != 0);
       ctx->value_buf.size = new_size;
     }
