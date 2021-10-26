@@ -21,6 +21,8 @@ DEF_EM(UNEXPECTED_OBJECT_END,
 DEF_EM(UNEXPECTED_ARRAY_END, "Unexpected end of array while not in an array");
 DEF_EM(UNEXPECTED_COMMA, "Unexpected \",\"");
 DEF_EM(UNEXPECTED_COLON, "Unexpected \":\"");
+DEF_EM(EXTRA_DOT_IN_FLOAT, "Extra \".\" found while parsing float");
+DEF_EM(BAD_EXPONENT, "Bad format while parsing exponent");
 DEF_EM(UNEXPECTED, "Unexpected input");
 DEF_EM(UNEXPECTED_UNICODE_SEQ, "Malformed unicode encoded sequence in string");
 #undef DEF_EM
@@ -579,10 +581,31 @@ jsont_tok_t jsont_next(jsont_ctx_t* ctx) {
           ctx->input_buf_value_start = ctx->input_buf_ptr-1;
           //uint8_t prev_b = 0;
           bool is_float = false;
+          bool is_exp = false;
           while (1) {
             b = _next_byte(ctx);
             if (b == '.') {
+              if (is_float || is_exp) {
+                ctx->error_info = JSONT_ERRINFO_EXTRA_DOT_IN_FLOAT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
               is_float = true;
+            } else if ( b == 'E' || b == 'e') {
+              if (is_exp) {
+                ctx->error_info = JSONT_ERRINFO_BAD_EXPONENT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
+              is_exp = true;
+              is_float = true;
+              // check for +- on exponent
+              b = _next_byte(ctx);
+              if (b == '+' || b == '-') {
+                b = _next_byte(ctx);
+              }
+              if (!isdigit((int)b)) {
+                ctx->error_info = JSONT_ERRINFO_BAD_EXPONENT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
             } else if (!isdigit((int)b)) {
               _rewind_one_byte(ctx);
               ctx->input_buf_value_end = ctx->input_buf_ptr;

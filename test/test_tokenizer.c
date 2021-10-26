@@ -37,7 +37,10 @@ int main(void) {
       "\"a\\rb\","
       "\"a\\tb\","
       "\"\","
-      "\"   \""
+      "\"   \","
+      "123.4e-2,"
+      "345.6E2,"
+      "789.12e+10"
     "]"
   "}";
 
@@ -168,6 +171,20 @@ int main(void) {
   assert(jsont_next(S) == JSONT_STRING);
   assert(jsont_str_equals(S, "   ") == true);
   assert(jsont_str_equals(S, "") == false);
+
+  // exponent formatting works 
+  //"123.4e-2"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 1.234) < 0.001);
+
+  //"345.6E2"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 34560.0) < 0.001);
+
+
+  //"789.12E+10"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 7891200000000.0) < 0.1);
 
   // ] }
   assert(jsont_next(S) == JSONT_ARRAY_END);
