@@ -51,6 +51,17 @@ extern "C" {
 // accessible through `jsont_user_data`.
 jsont_ctx_t* jsont_create(void* user_data);
 
+// Create a new JSON tokenizer context with a
+// custom allocation function. 
+//
+// the custom allocation function serves as malloc, realloc and free.
+// * if size == 0, then the operation is a free,
+// * if ptr == NULL, then the operation is a malloc.
+// * otherwise, the operation is a realloc
+jsont_ctx_t* jsont_create_alloc(
+   void* user_data,
+   void * (*lrealloc)(void * user_data, void * p, size_t size));
+
 // Destroy a JSON tokenizer context. This will free any internal data, except
 // from the input buffer.
 void jsont_destroy(jsont_ctx_t* ctx);
