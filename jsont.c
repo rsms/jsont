@@ -21,6 +21,8 @@ DEF_EM(UNEXPECTED_OBJECT_END,
 DEF_EM(UNEXPECTED_ARRAY_END, "Unexpected end of array while not in an array");
 DEF_EM(UNEXPECTED_COMMA, "Unexpected \",\"");
 DEF_EM(UNEXPECTED_COLON, "Unexpected \":\"");
+DEF_EM(EXTRA_DOT_IN_FLOAT, "Extra \".\" found while parsing float");
+DEF_EM(BAD_EXPONENT, "Bad format while parsing exponent");
 DEF_EM(UNEXPECTED, "Unexpected input");
 DEF_EM(UNEXPECTED_UNICODE_SEQ, "Malformed unicode encoded sequence in string");
 #undef DEF_EM
@@ -45,6 +47,7 @@ typedef uint8_t jsont_tok_t;
 
 typedef struct jsont_ctx {
   void* user_data;
+  void * (*lrealloc)(void * user_data, void * p, size_t size);
   const uint8_t* input_buf;
   const uint8_t* input_buf_ptr;
   size_t input_len;
@@ -74,7 +77,7 @@ unsigned long _hex_str_to_ul(const uint8_t* bytes, size_t len) {
   for (size_t i = 0; i != len; ++i) {
     uint8_t b = bytes[i];
     int digit = (b > '0'-1 && b < 'f'+1) ? kHexValueTable[b-'0'] : -1;
-    if (b == -1 || // bad digit
+    if (digit == -1 || // bad digit
         (value > cutoff) || // overflow
         ((value == cutoff) && (digit > cutoff_digit)) ) {
       return ULONG_MAX;
@@ -86,18 +89,43 @@ unsigned long _hex_str_to_ul(const uint8_t* bytes, size_t len) {
   return value;
 }
 
-jsont_ctx_t* jsont_create(void* user_data) {
-  jsont_ctx_t* ctx = (jsont_ctx_t*)calloc(1, sizeof(jsont_ctx_t));
+/**
+ *  a "multitool" allocator that encapsulates allocate, reallocate 
+ *     and free functionality. 
+ * 
+ *  if p == NULL, then allocate "size" bytes.
+ *  if p != NULL, and size != 0, then reallocate to "size" bytes.
+ *  otherwise, free(p)
+ */
+static void * lrealloc(void * ign, void *p, size_t size) {
+    (void)ign; // unused
+    if (size) return realloc(p, size);
+    free(p);
+    return NULL;
+}
+
+
+jsont_ctx_t* jsont_create_alloc(
+		void* user_data,
+		void * (*lrealloc)(void * user_data, void * p, size_t size)) {
+  jsont_ctx_t* ctx = (jsont_ctx_t*)lrealloc(user_data, NULL, sizeof(jsont_ctx_t));
+  memset(ctx, 0, sizeof(jsont_ctx_t));
   ctx->user_data = user_data;
+  ctx->lrealloc = lrealloc;
   ctx->st_stack_size = _STRUCT_TYPE_STACK_SIZE;
   return ctx;
 }
 
+jsont_ctx_t* jsont_create(void* user_data) {
+	return jsont_create_alloc(user_data, lrealloc);
+}
+
+
 void jsont_destroy(jsont_ctx_t* ctx) {
   if (ctx->value_buf.data != 0) {
-    free(ctx->value_buf.data);
+    ctx->lrealloc(ctx->user_data, ctx->value_buf.data, 0);
   }
-  free(ctx);
+  ctx->lrealloc(ctx->user_data, ctx, 0);
 }
 
 void jsont_reset(jsont_ctx_t* ctx, const uint8_t* bytes, size_t length) {
@@ -172,9 +200,13 @@ bool jsont_data_equals(jsont_ctx_t* ctx, const uint8_t* bytes, size_t length) {
       (memcmp((const void*)ctx->value_buf.data,
         (const void*)bytes, length) == 0);
   } else {
-    return (ctx->input_buf_value_end - ctx->input_buf_value_start == length) &&
-      (memcmp((const void*)ctx->input_buf_value_start,
-        (const void*)bytes, length) == 0);
+    size_t value_length =
+      ctx->input_buf_value_end - ctx->input_buf_value_start;
+    if (value_length != length) {
+      return 0;
+    }
+    return (memcmp((const void*)ctx->input_buf_value_start,
+                   (const void*)bytes, length) == 0);
   }
 }
 
@@ -184,7 +216,7 @@ char* jsont_strcpy_value(jsont_ctx_t* ctx) {
   } else {
     const uint8_t* bytes = 0;
     size_t len = jsont_data_value(ctx, &bytes);
-    char* buf = (char*)malloc(len+1);
+    char* buf = (char*)ctx->lrealloc(ctx->user_data, NULL, len+1);
     if (memcpy((void*)buf, (const void*)bytes, len) != buf) {
       return 0;
     }
@@ -351,14 +383,14 @@ static void _value_buf_append(jsont_ctx_t* ctx, const uint8_t* data, size_t len)
     if (ctx->value_buf.size < _VALUE_BUF_MIN_SIZE) {
       ctx->value_buf.size = _VALUE_BUF_MIN_SIZE;
     }
-    ctx->value_buf.data = (uint8_t*)malloc(ctx->value_buf.size);
+    ctx->value_buf.data = (uint8_t*)ctx->lrealloc(ctx->user_data, NULL, ctx->value_buf.size);
     if (len != 0) {
       memcpy(ctx->value_buf.data, data, len);
     }
   } else {
     if (ctx->value_buf.length + len > ctx->value_buf.size) {
       size_t new_size = ctx->value_buf.size + (len * 2);
-      ctx->value_buf.data = realloc(ctx->value_buf.data, new_size);
+      ctx->value_buf.data = ctx->lrealloc(ctx->user_data, ctx->value_buf.data, new_size);
       assert(ctx->value_buf.data != 0);
       ctx->value_buf.size = new_size;
     }
@@ -543,10 +575,31 @@ jsont_tok_t jsont_next(jsont_ctx_t* ctx) {
           ctx->input_buf_value_start = ctx->input_buf_ptr-1;
           //uint8_t prev_b = 0;
           bool is_float = false;
+          bool is_exp = false;
           while (1) {
             b = _next_byte(ctx);
             if (b == '.') {
+              if (is_float || is_exp) {
+                ctx->error_info = JSONT_ERRINFO_EXTRA_DOT_IN_FLOAT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
               is_float = true;
+            } else if ( b == 'E' || b == 'e') {
+              if (is_exp) {
+                ctx->error_info = JSONT_ERRINFO_BAD_EXPONENT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
+              is_exp = true;
+              is_float = true;
+              // check for +- on exponent
+              b = _next_byte(ctx);
+              if (b == '+' || b == '-') {
+                b = _next_byte(ctx);
+              }
+              if (!isdigit((int)b)) {
+                ctx->error_info = JSONT_ERRINFO_BAD_EXPONENT;
+                return _set_tok(ctx, JSONT_ERR);
+              }
             } else if (!isdigit((int)b)) {
               _rewind_one_byte(ctx);
               ctx->input_buf_value_end = ctx->input_buf_ptr;
@@ -566,4 +619,3 @@ jsont_tok_t jsont_next(jsont_ctx_t* ctx) {
     }
   } // while (1)
 }
-

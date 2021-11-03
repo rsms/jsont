@@ -8,7 +8,7 @@
 
 static const char* _tok_name(jsont_tok_t tok);
 
-int main(int argc, const char** argv) {
+int main(void) {
   // Create a new reusable tokenizer
   jsont_ctx_t* S = jsont_create(0);
 
@@ -37,7 +37,7 @@ int main(int argc, const char** argv) {
     } else if (tok == JSONT_NUMBER_FLOAT) {
       printf(" %f", jsont_float_value(S));
     }
-    
+
     printf("\n");
   }
 

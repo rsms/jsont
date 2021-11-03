@@ -10,7 +10,7 @@
     strlen(fieldName)) == true); \
 } while(0)
 
-int main(int argc, const char** argv) {
+int main(void) {
   // Create a new reusable tokenizer
   jsont_ctx_t* S = jsont_create(0);
 
@@ -37,7 +37,10 @@ int main(int argc, const char** argv) {
       "\"a\\rb\","
       "\"a\\tb\","
       "\"\","
-      "\"   \""
+      "\"   \","
+      "123.4e-2,"
+      "345.6E2,"
+      "789.12e+10"
     "]"
   "}";
 
@@ -81,7 +84,7 @@ int main(int argc, const char** argv) {
   // Expect the string '\u2192' (RIGHTWARDS ARROW, UTF8: E2,86,92)
   assert(jsont_next(S) == JSONT_STRING);
   assert(jsont_str_equals(S, "\xe2\x86\x92") == true);
-  
+
   // Expect a field name 'n'
   jsont_next(S);
   JSONT_ASSERT_FIELD_NAME("n");
@@ -168,6 +171,20 @@ int main(int argc, const char** argv) {
   assert(jsont_next(S) == JSONT_STRING);
   assert(jsont_str_equals(S, "   ") == true);
   assert(jsont_str_equals(S, "") == false);
+
+  // exponent formatting works 
+  //"123.4e-2"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 1.234) < 0.001);
+
+  //"345.6E2"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 34560.0) < 0.001);
+
+
+  //"789.12E+10"
+  assert(jsont_next(S) == JSONT_NUMBER_FLOAT);
+  assert(fabs(jsont_float_value(S) - 7891200000000.0) < 0.1);
 
   // ] }
   assert(jsont_next(S) == JSONT_ARRAY_END);

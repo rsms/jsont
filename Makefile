@@ -18,7 +18,7 @@ test_object_dirs = $(sort $(foreach fn,$(test_objects),$(dir $(fn))))
 CC = clang
 LD = clang
 
-CFLAGS 	+= -Wall -g -MMD -std=c99 -I.
+CFLAGS 	+= -Wall -Wextra -pedantic -ansi -g -MMD -std=c99 -I.
 TEST_CFLAGS := $(CFLAGS) -O0
 #LDFLAGS +=
 ifneq ($(DEBUG),)
